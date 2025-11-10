@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext, useCallback } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import Context from "../context";
@@ -23,7 +23,17 @@ const Payment = () => {
   const userId = user?._id;
   const navigate = useNavigate();
 
-  const fetchCartItems = useCallback(async () => {
+  useEffect(() => {
+    if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
+    setLoading(true);
+    fetchCartItems();
+    fetch("https://provinces.open-api.vn/api/p/")
+      .then((res) => res.json())
+      .then(setProvinces)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const fetchCartItems = async () => {
     const res = await fetch(SummaryApi.addToCartProductView.url, {
       method: SummaryApi.addToCartProductView.method,
       credentials: "include",
@@ -31,22 +41,10 @@ const Payment = () => {
     });
     const result = await res.json();
     if (result.success) setCartItems(result.data || []);
-  }, []);
-
-  useEffect(() => {
-    if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
-    setLoading(true);
-    fetchCartItems();
-    // ✅ FIX 1: Sửa http thành https cho fetch API tỉnh/thành phố lần đầu
-    fetch("https://provinces.open-api.vn/api/p/")
-      .then((res) => res.json())
-      .then(setProvinces)
-      .finally(() => setLoading(false));
-  }, [user?.name, fetchCartItems]);
+  };
 
   useEffect(() => {
     if (province) {
-      // ✅ FIX 2: Sửa http thành https cho fetch API quận/huyện
       fetch(`https://provinces.open-api.vn/api/p/${province}?depth=2`)
         .then((res) => res.json())
         .then((data) => {
@@ -65,7 +63,6 @@ const Payment = () => {
 
   useEffect(() => {
     if (district) {
-      // ✅ FIX 3: Sửa http thành https cho fetch API phường/xã
       fetch(`https://provinces.open-api.vn/api/d/${district}?depth=2`)
         .then((res) => res.json())
         .then((data) => {
@@ -91,6 +88,7 @@ const Payment = () => {
     0
   );
 
+  // 🌟 HÀM THANH TOÁN (đẹp + có loading)
   const handlePayment = async (e) => {
     e.preventDefault();
 
@@ -246,43 +244,33 @@ const Payment = () => {
             </div>
           ) : (
             <>
-              {cartItems.map((item, idx) => {
-                // ✅ FIX: Buộc đường dẫn hình ảnh thành HTTPS
-                const imageUrl = item.productId.productImage?.[0] || "";
-                const secureImageUrl = imageUrl.replace(
-                  /^http:\/\//i,
-                  "https://"
-                );
-
-                return (
-                  <div
-                    key={idx}
-                    className="flex justify-between items-center border-b py-3 hover:bg-gray-50 transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        // SỬ DỤNG secureImageUrl ĐÃ SỬA LỖI
-                        src={secureImageUrl}
-                        alt={item.productId.productName}
-                        className="w-16 h-16 object-contain rounded-md border"
-                      />
-                      <div>
-                        <h3 className="font-medium text-gray-800">
-                          {item.productId?.productName}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          SL: {item.quantity}
-                        </p>
-                      </div>
+              {cartItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-center border-b py-3 hover:bg-gray-50 transition"
+                >
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={item.productId.productImage?.[0]}
+                      alt={item.productId.productName}
+                      className="w-16 h-16 object-contain rounded-md border"
+                    />
+                    <div>
+                      <h3 className="font-medium text-gray-800">
+                        {item.productId?.productName}
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        SL: {item.quantity}
+                      </p>
                     </div>
-                    <span className="text-red-600 font-semibold">
-                      {displayINRCurrency(
-                        item.productId?.sellingPrice * item.quantity
-                      )}
-                    </span>
                   </div>
-                );
-              })}
+                  <span className="text-red-600 font-semibold">
+                    {displayINRCurrency(
+                      item.productId?.sellingPrice * item.quantity
+                    )}
+                  </span>
+                </div>
+              ))}
               <div className="mt-5 flex justify-between font-semibold text-gray-800">
                 <span>Tổng SL:</span>
                 <span>{totalQuantity}</span>
@@ -302,7 +290,125 @@ const Payment = () => {
           </h2>
 
           <form onSubmit={handlePayment} className="space-y-5">
-            <div>{/* ... Phần form input ... */}</div>
+            <div>
+              <label className="block mb-1 font-medium text-gray-700">
+                Họ và tên
+              </label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block mb-1 font-medium text-gray-700">
+                Số điện thoại
+              </label>
+              <input
+                type="tel"
+                name="phone"
+                value={formData.phone}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData((prev) => ({ ...prev, phone: value }));
+                  const vnPhoneRegex = /^(0[3|5|7|8|9])[0-9]{8}$/;
+                  if (value && !vnPhoneRegex.test(value)) {
+                    e.target.setCustomValidity("Số điện thoại không hợp lệ!");
+                  } else {
+                    e.target.setCustomValidity("");
+                  }
+                }}
+                placeholder="VD: 0901234567"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <select
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
+                required
+              >
+                <option value="">Tỉnh / TP</option>
+                {provinces.map((p) => (
+                  <option key={p.code} value={p.code}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
+                disabled={!province}
+              >
+                <option value="">Quận / Huyện</option>
+                {districts.map((d) => (
+                  <option key={d.code} value={d.code}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={ward}
+                onChange={(e) => setWard(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
+                disabled={!district}
+              >
+                <option value="">Phường / Xã</option>
+                {wards.map((w) => (
+                  <option key={w.code} value={w.code}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block mb-2 font-medium text-gray-700">
+                Phương thức thanh toán
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cod"
+                    checked={paymentMethod === "cod"}
+                    onChange={() => setPaymentMethod("cod")}
+                    className="accent-red-500"
+                  />
+                  <span>Thanh toán khi nhận hàng (COD)</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="online"
+                    checked={paymentMethod === "online"}
+                    onChange={() => setPaymentMethod("online")}
+                    className="accent-red-500"
+                  />
+                  <span>Thanh toán online</span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              className="w-full mt-6 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition duration-200"
+            >
+              ✅ Xác Nhận Thanh Toán
+            </button>
           </form>
         </div>
       </div>
