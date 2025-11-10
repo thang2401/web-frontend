@@ -68,8 +68,10 @@ const CategoryProduct = () => {
     const categoryQuery = activeCategories
       .map((cat) => `category=${cat}`)
       .join("&&");
+
+    // SỬA LỖI: Thêm filteredCategories vào dependency để React biết trạng thái phụ thuộc.
     navigate(`/product-category?${categoryQuery}`);
-  }, [selectedCategories, navigate]);
+  }, [selectedCategories, navigate, filteredCategories]); // <-- ĐÃ THÊM filteredCategories
 
   const handleSortChange = (e) => {
     const { value } = e.target;

@@ -1,4 +1,10 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from "react"; // ĐÃ SỬA: Thêm useCallback
 import { Link } from "react-router-dom";
 import { FaAngleLeft, FaAngleRight } from "react-icons/fa6";
 
@@ -15,16 +21,18 @@ const VerticalCardProduct = ({ category, heading }) => {
 
   const loadingList = new Array(13).fill(null);
 
-  const fetchData = async () => {
+  // ĐÃ SỬA LỖI: Bọc fetchData trong useCallback
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const res = await fetchCategoryWiseProduct(category);
     setData(res?.data || []);
     setLoading(false);
-  };
+  }, [category]); // Hàm fetchData phụ thuộc vào 'category'
 
   useEffect(() => {
+    // ĐÃ SỬA LỖI: Thêm fetchData vào mảng dependency
     fetchData();
-  }, []);
+  }, [fetchData]); // Chỉ phụ thuộc vào fetchData (là hàm useCallback)
 
   const handleAddToCart = async (e, id) => {
     await addToCart(e, id);
@@ -68,7 +76,7 @@ const VerticalCardProduct = ({ category, heading }) => {
           className="object-scale-down h-full hover:scale-110 transition-all mix-blend-multiply"
         />
       </div>
-      <div className="p-4  grid gap-3">
+      <div className="p-4  grid gap-3">
         <h2 className="font-medium uppercase text-base md:text-lg text-ellipsis line-clamp-1 text-black">
           {product?.productName}
         </h2>
