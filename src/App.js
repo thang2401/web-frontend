@@ -16,7 +16,6 @@ function App() {
   const [cartProductCount, setCartProductCount] = useState(0);
   const location = useLocation();
 
-  // 🔹 Dùng useCallback để đảm bảo function ổn định
   const fetchUserDetails = useCallback(async () => {
     try {
       const dataResponse = await fetch(SummaryApi.current_user.url, {
@@ -25,10 +24,13 @@ function App() {
       });
       const dataApi = await dataResponse.json();
 
+      // SỬA LỖI 401: Chỉ dispatch khi API báo success (200 OK)
+      // Nếu API trả về 401 hoặc lỗi khác, ta bỏ qua, không hiển thị lỗi console.
       if (dataApi.success) {
         dispatch(setUserDetails(dataApi.data));
       }
     } catch (err) {
+      // Chỉ log lỗi nếu đó là lỗi mạng/hệ thống thực sự
       console.error("❌ Lỗi fetch user details:", err);
     }
   }, [dispatch]);
@@ -40,14 +42,22 @@ function App() {
         credentials: "include",
       });
       const dataApi = await dataResponse.json();
-      setCartProductCount(dataApi?.data?.count || 0);
+
+      // SỬA LỖI 401: Chỉ cập nhật cart count khi API báo success
+      if (dataApi.success) {
+        setCartProductCount(dataApi?.data?.count || 0);
+      } else {
+        // Nếu không thành công (ví dụ: 401), set count về 0
+        setCartProductCount(0);
+      }
     } catch (err) {
+      // Chỉ log lỗi nếu đó là lỗi mạng/hệ thống thực sự
       console.error("❌ Lỗi fetch cart count:", err);
     }
   }, []);
 
-  // 🔹 useEffect chỉ phụ thuộc vào function ổn định
   useEffect(() => {
+    // Chạy fetch ngay khi khởi động
     fetchUserDetails();
     fetchUserAddToCart();
   }, [fetchUserDetails, fetchUserAddToCart]);
