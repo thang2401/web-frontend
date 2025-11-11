@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import Context from "../context";
-import SummaryApi from "../common";
+import SummaryApi from "../common"; // Cần đảm bảo file này có endpoint cho VNPay
 import displayINRCurrency from "../helpers/displayCurrency";
 import Swal from "sweetalert2";
 
@@ -26,7 +26,7 @@ const Payment = () => {
   useEffect(() => {
     if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
     setLoading(true);
-    fetchCartItems();
+    fetchCartItems(); // Fetch Provinces
     fetch("https://provinces.open-api.vn/api/p/")
       .then((res) => res.json())
       .then(setProvinces)
@@ -41,7 +41,7 @@ const Payment = () => {
     });
     const result = await res.json();
     if (result.success) setCartItems(result.data || []);
-  };
+  }; // Logic fetch Districts
 
   useEffect(() => {
     if (province) {
@@ -59,7 +59,7 @@ const Payment = () => {
       setDistrict("");
       setWard("");
     }
-  }, [province]);
+  }, [province]); // Logic fetch Wards
 
   useEffect(() => {
     if (district) {
@@ -124,16 +124,16 @@ const Payment = () => {
     const { isConfirmed } = await Swal.fire({
       title: "Xác nhận thanh toán",
       html: `
-        <div style="text-align:left; font-size:15px;">
-          <p><b>Tổng tiền:</b> ${displayINRCurrency(totalCost)}</p>
-          <p><b>Phương thức:</b> ${
-            paymentMethod === "cod"
-              ? "Thanh toán khi nhận hàng"
-              : "Thanh toán online"
-          }</p>
-          <p><b>Địa chỉ:</b> ${fullAddress}</p>
-        </div>
-      `,
+  <div style="text-align:left; font-size:15px;">
+  <p><b>Tổng tiền:</b> ${displayINRCurrency(totalCost)}</p>
+  <p><b>Phương thức:</b> ${
+        paymentMethod === "cod"
+          ? "Thanh toán khi nhận hàng"
+          : "Thanh toán online"
+      }</p>
+  <p><b>Địa chỉ:</b> ${fullAddress}</p>
+  </div>
+  `,
       icon: "question",
       showCancelButton: true,
       confirmButtonText: "✅ Xác nhận",
@@ -149,9 +149,8 @@ const Payment = () => {
         text: "Vui lòng chờ trong giây lát.",
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
-      });
+      }); // 🔹 Format items để backend nhận ObjectId
 
-      // 🔹 Format items để backend nhận ObjectId
       const formattedItems = cartItems.map((item) => ({
         productId: item.productId._id,
         name: item.productId.productName,
@@ -168,23 +167,42 @@ const Payment = () => {
         totalCost,
       };
 
+      // =========================================================
+      // 🚀 ĐÃ SỬA: XỬ LÝ THANH TOÁN ONLINE (VNPAY)
+      // =========================================================
       if (paymentMethod === "online") {
-        const productNames = cartItems
-          .map((item) => item.productId.productName)
-          .join(", ");
-        Swal.close();
-        navigate("/qr-payment", {
-          state: {
-            name: formData.name,
-            phone: formData.phone,
-            address: fullAddress,
-            totalCost,
-            products: productNames,
-            orderId: Math.floor(Math.random() * 1000000),
-          },
+        const orderInfo = `Thanh toan don hang cua khach hang ${formData.name}. Tong tien: ${totalCost}`;
+
+        // GỌI API BACKEND ĐỂ TẠO URL VNPAY
+        const vnpayRes = await fetch(SummaryApi.vnpayCreatePaymentUrl.url, {
+          method: SummaryApi.vnpayCreatePaymentUrl.method,
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            amount: totalCost,
+            orderInfo: orderInfo,
+            bankCode: "VNPAYQR",
+          }),
         });
-        return;
+
+        const vnpayResult = await vnpayRes.json();
+        Swal.close();
+
+        if (vnpayResult.paymentUrl) {
+          // CHUYỂN HƯỚNG ĐẾN CỔNG THANH TOÁN VNPAY
+          window.location.href = vnpayResult.paymentUrl;
+          return; // Kết thúc hàm
+        } else {
+          return Swal.fire(
+            "❌ Lỗi Khởi Tạo",
+            vnpayResult.message || "Không thể tạo liên kết thanh toán VNPay.",
+            "error"
+          );
+        }
       }
+      // =========================================================
+      // 💻 XỬ LÝ THANH TOÁN COD (CODE CŨ GIỮ NGUYÊN)
+      // =========================================================
 
       const paymentRes = await fetch(SummaryApi.processPayment.url, {
         method: SummaryApi.processPayment.method,
@@ -201,7 +219,7 @@ const Payment = () => {
           "Không thể lưu đơn hàng. Vui lòng thử lại.",
           "error"
         );
-      }
+      } // Xóa giỏ hàng
 
       const clearRes = await fetch(SummaryApi.deleteCart.url, {
         method: SummaryApi.deleteCart.method,
@@ -239,11 +257,12 @@ const Payment = () => {
       </h1>
 
       <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10">
-        {/* Tóm tắt đơn hàng */}
+        {/* Tóm tắt đơn hàng */} 
         <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
           <h2 className="text-2xl font-semibold text-red-600 mb-5 border-b pb-3">
             Tóm Tắt Đơn Hàng
           </h2>
+
           {loading ? (
             <div className="text-center text-gray-500 animate-pulse">
               Đang tải...
@@ -261,15 +280,18 @@ const Payment = () => {
                       alt={item.productId.productName}
                       className="w-16 h-16 object-contain rounded-md border"
                     />
+
                     <div>
                       <h3 className="font-medium text-gray-800">
-                        {item.productId?.productName}
+                        {item.productId?.productName} 
                       </h3>
+
                       <p className="text-sm text-gray-500">
                         SL: {item.quantity}
                       </p>
                     </div>
                   </div>
+
                   <span className="text-red-600 font-semibold">
                     {displayINRCurrency(
                       item.productId?.sellingPrice * item.quantity
@@ -277,10 +299,12 @@ const Payment = () => {
                   </span>
                 </div>
               ))}
+
               <div className="mt-5 flex justify-between font-semibold text-gray-800">
                 <span>Tổng SL:</span>
                 <span>{totalQuantity}</span>
               </div>
+
               <div className="mt-2 flex justify-between text-xl font-bold text-red-600">
                 <span>Tổng tiền:</span>
                 <span>{displayINRCurrency(totalCost)}</span>
@@ -288,8 +312,7 @@ const Payment = () => {
             </>
           )}
         </div>
-
-        {/* Form thanh toán */}
+        {/* Form thanh toán */} 
         <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
           <h2 className="text-2xl font-semibold mb-5 text-gray-800">
             Thông Tin Người Nhận
@@ -300,6 +323,7 @@ const Payment = () => {
               <label className="block mb-1 font-medium text-gray-700">
                 Họ và tên
               </label>
+
               <input
                 type="text"
                 name="name"
@@ -314,6 +338,7 @@ const Payment = () => {
               <label className="block mb-1 font-medium text-gray-700">
                 Số điện thoại
               </label>
+
               <input
                 type="tel"
                 name="phone"
@@ -342,6 +367,7 @@ const Payment = () => {
                 required
               >
                 <option value="">Tỉnh / TP</option>
+
                 {provinces.map((p) => (
                   <option key={p.code} value={p.code}>
                     {p.name}
@@ -355,7 +381,7 @@ const Payment = () => {
                 className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
                 disabled={!province}
               >
-                <option value="">Quận / Huyện</option>
+                <option value="">Quận / Huyện</option> 
                 {districts.map((d) => (
                   <option key={d.code} value={d.code}>
                     {d.name}
@@ -369,7 +395,7 @@ const Payment = () => {
                 className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500"
                 disabled={!district}
               >
-                <option value="">Phường / Xã</option>
+                <option value="">Phường / Xã</option> 
                 {wards.map((w) => (
                   <option key={w.code} value={w.code}>
                     {w.name}
@@ -382,6 +408,7 @@ const Payment = () => {
               <label className="block mb-2 font-medium text-gray-700">
                 Phương thức thanh toán
               </label>
+
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -392,7 +419,7 @@ const Payment = () => {
                     onChange={() => setPaymentMethod("cod")}
                     className="accent-red-500"
                   />
-                  <span>Thanh toán khi nhận hàng (COD)</span>
+                  <span>Thanh toán khi nhận hàng (COD)</span> 
                 </label>
 
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -404,7 +431,7 @@ const Payment = () => {
                     onChange={() => setPaymentMethod("online")}
                     className="accent-red-500"
                   />
-                  <span>Thanh toán online</span>
+                  <span>Thanh toán online (VNPay)</span> 
                 </label>
               </div>
             </div>
