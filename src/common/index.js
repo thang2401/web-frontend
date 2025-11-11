@@ -2,6 +2,10 @@ const backendDomin = "https://api.domanhhung.id.vn"; // Đã sửa lỗi chính 
 
 const SummaryApi = {
   // Authentication & User
+  signUP: {
+    url: `${backendDomin}/api/signup`,
+    method: "post",
+  },
   signIn: {
     url: `${backendDomin}/api/signin`,
     method: "post",
