@@ -4,12 +4,13 @@ import { useNavigate } from "react-router-dom";
 import Context from "../context";
 import SummaryApi from "../common";
 import displayINRCurrency from "../helpers/displayCurrency";
+import Swal from "sweetalert2";
 
 const Payment = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ name: "", phone: "" });
-  const [paymentMethod, setPaymentMethod] = useState("cod"); // COD mặc định
+  const [paymentMethod, setPaymentMethod] = useState("cod");
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
@@ -22,17 +23,15 @@ const Payment = () => {
   const userId = user?._id;
   const navigate = useNavigate();
 
-  // 🧭 Lấy thông tin giỏ hàng + danh sách tỉnh
   useEffect(() => {
     if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
-
     setLoading(true);
     fetchCartItems();
     fetch("https://provinces.open-api.vn/api/p/")
       .then((res) => res.json())
       .then(setProvinces)
       .finally(() => setLoading(false));
-  }, [user.name]);
+  }, [user?.name]);
 
   const fetchCartItems = async () => {
     const res = await fetch(SummaryApi.addToCartProductView.url, {
@@ -44,7 +43,6 @@ const Payment = () => {
     if (result.success) setCartItems(result.data || []);
   };
 
-  // 🧭 Load quận, huyện, phường
   useEffect(() => {
     if (province) {
       fetch(`https://provinces.open-api.vn/api/p/${province}?depth=2`)
@@ -90,15 +88,29 @@ const Payment = () => {
     0
   );
 
-  // 🧾 Xử lý thanh toán
   const handlePayment = async (e) => {
     e.preventDefault();
 
-    if (!userId) return alert("Vui lòng đăng nhập để thanh toán.");
+    if (!userId)
+      return Swal.fire(
+        "⚠️ Thông báo",
+        "Vui lòng đăng nhập để thanh toán.",
+        "warning"
+      );
+
     if (!province || !district || !ward)
-      return alert("Vui lòng chọn đầy đủ địa chỉ.");
+      return Swal.fire(
+        "⚠️ Thiếu thông tin",
+        "Vui lòng chọn đầy đủ địa chỉ.",
+        "warning"
+      );
+
     if (!validatePhone(formData.phone))
-      return alert("Số điện thoại không hợp lệ.");
+      return Swal.fire(
+        "📞 Lỗi số điện thoại",
+        "Số điện thoại không hợp lệ.",
+        "error"
+      );
 
     const wardObj = wards.find((w) => String(w.code) === String(ward));
     const districtObj = districts.find(
@@ -109,78 +121,110 @@ const Payment = () => {
     );
     const fullAddress = `${wardObj?.name}, ${districtObj?.name}, ${provinceObj?.name}`;
 
-    const confirmCheckout = window.confirm(
-      `Xác nhận thanh toán ${displayINRCurrency(totalCost)}?\nPhương thức: ${
-        paymentMethod === "cod"
-          ? "Thanh toán khi nhận hàng"
-          : "Thanh toán online"
-      }\nĐịa chỉ: ${fullAddress}`
-    );
-    if (!confirmCheckout) return;
+    const { isConfirmed } = await Swal.fire({
+      title: "Xác nhận thanh toán",
+      html: `
+        <div style="text-align:left; font-size:15px;">
+          <p><b>Tổng tiền:</b> ${displayINRCurrency(totalCost)}</p>
+          <p><b>Phương thức:</b> ${
+            paymentMethod === "cod"
+              ? "Thanh toán khi nhận hàng"
+              : "Thanh toán online"
+          }</p>
+          <p><b>Địa chỉ:</b> ${fullAddress}</p>
+        </div>
+      `,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "✅ Xác nhận",
+      cancelButtonText: "❌ Hủy",
+      reverseButtons: true,
+    });
+
+    if (!isConfirmed) return;
 
     try {
+      Swal.fire({
+        title: "Đang xử lý thanh toán...",
+        text: "Vui lòng chờ trong giây lát.",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      // 🔹 Format items để backend nhận ObjectId
+      const formattedItems = cartItems.map((item) => ({
+        productId: item.productId._id,
+        name: item.productId.productName,
+        price: item.productId.sellingPrice,
+        quantity: item.quantity,
+      }));
+
       const paymentData = {
         ...formData,
         address: fullAddress,
-        items: cartItems,
+        items: formattedItems,
         userId,
         paymentMethod,
         totalCost,
       };
 
       if (paymentMethod === "online") {
-        // Chuẩn bị nội dung chuyển khoản
         const productNames = cartItems
           .map((item) => item.productId.productName)
           .join(", ");
-
-        // Chuyển hướng sang trang QR, gửi dữ liệu
+        Swal.close();
         navigate("/qr-payment", {
           state: {
             name: formData.name,
             phone: formData.phone,
-            address: `${wardObj?.name}, ${districtObj?.name}, ${provinceObj?.name}`,
+            address: fullAddress,
             totalCost,
             products: productNames,
-            orderId: Math.floor(Math.random() * 1000000), // mã đơn ngẫu nhiên
+            orderId: Math.floor(Math.random() * 1000000),
           },
         });
         return;
       }
 
-      // Gửi thông tin đơn hàng
-      const payment = await fetch(SummaryApi.processPayment.url, {
+      const paymentRes = await fetch(SummaryApi.processPayment.url, {
         method: SummaryApi.processPayment.method,
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(paymentData),
       });
 
-      const paymentResult = await payment.json();
-      if (!paymentResult.success) return alert("Lỗi khi lưu đơn hàng.");
+      const paymentResult = await paymentRes.json();
+      if (!paymentResult.success) {
+        Swal.close();
+        return Swal.fire(
+          "❌ Lỗi",
+          "Không thể lưu đơn hàng. Vui lòng thử lại.",
+          "error"
+        );
+      }
 
-      // Xóa giỏ hàng
-      const clear = await fetch(SummaryApi.cleanCart.url, {
-        method: SummaryApi.cleanCart.method,
+      const clearRes = await fetch(SummaryApi.deleteCart.url, {
+        method: SummaryApi.deleteCart.method,
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ userId }),
       });
+      const clearResult = await clearRes.json();
+      Swal.close();
 
-      const clearResult = await clear.json();
       if (clearResult.success) {
-        alert("✅ Đặt hàng thành công!");
+        await Swal.fire("🎉 Thành công!", "Đặt hàng thành công!", "success");
         setCartItems([]);
         navigate("/");
         context.setCartProductCount(0);
       }
     } catch (err) {
       console.error(err);
-      alert("Lỗi hệ thống khi thanh toán. Vui lòng thử lại.");
+      Swal.close();
+      Swal.fire("⚠️ Lỗi hệ thống", "Vui lòng thử lại sau.", "error");
     }
   };
 
-  // 🎨 Giao diện
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-10 px-4">
       <button
@@ -200,7 +244,6 @@ const Payment = () => {
           <h2 className="text-2xl font-semibold text-red-600 mb-5 border-b pb-3">
             Tóm Tắt Đơn Hàng
           </h2>
-
           {loading ? (
             <div className="text-center text-gray-500 animate-pulse">
               Đang tải...
@@ -253,7 +296,6 @@ const Payment = () => {
           </h2>
 
           <form onSubmit={handlePayment} className="space-y-5">
-            {/* Họ tên */}
             <div>
               <label className="block mb-1 font-medium text-gray-700">
                 Họ và tên
@@ -268,7 +310,6 @@ const Payment = () => {
               />
             </div>
 
-            {/* Số điện thoại (kiểm tra hợp lệ) */}
             <div>
               <label className="block mb-1 font-medium text-gray-700">
                 Số điện thoại
@@ -293,7 +334,6 @@ const Payment = () => {
               />
             </div>
 
-            {/* Địa chỉ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <select
                 value={province}
@@ -338,7 +378,6 @@ const Payment = () => {
               </select>
             </div>
 
-            {/* Chọn phương thức thanh toán */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
                 Phương thức thanh toán
@@ -370,7 +409,6 @@ const Payment = () => {
               </div>
             </div>
 
-            {/* Nút xác nhận */}
             <button
               type="submit"
               className="w-full mt-6 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition duration-200"
