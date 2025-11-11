@@ -16,6 +16,8 @@ import OrderManagement from "../pages/OrderManagement";
 import MyOder from "../pages/MyOder";
 import ResetPassword from "../pages/ResetPassword";
 import ChangPass from "../pages/ChangPass";
+import VerifyOtp from "../pages/VerifyOtp";
+import SetPassword from "../pages/SetPassword";
 import Qr from "../pages/Qr";
 import TwoFAVerify from "../pages/TwoFAVerify"; // Cần tạo component này
 import TwoFASetup from "../pages/TwoFASetup"; // Cần tạo component này
@@ -52,6 +54,15 @@ const router = createBrowserRouter([
         path: "forgot-password",
         element: <ForgotPassowrd />,
       },
+      {
+        path: "verify-otp",
+        element: <VerifyOtp />,
+      },
+      {
+        path: "set-password",
+        element: <SetPassword />,
+      },
+
       {
         path: "sign-up",
         element: <SignUp />,

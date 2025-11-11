@@ -13,15 +13,19 @@ const SummaryApi = {
   // KHÔNG CÒN API SIGNUP CŨ GÂY LỖI 404
 
   // ✅ API MỚI CHO QUY TRÌNH ĐĂNG KÝ 1-BƯỚC
-  sendOtpToSignUp: {
-    url: `${backendDomin}/api/send-otp-to-signup`,
-    method: "POST",
-  },
-  finalSignUp: {
-    url: `${backendDomin}/api/final-signup`,
-    method: "POST",
-  },
 
+  sendOtpToSignUp: {
+    url: "https://api.domanhhung.id.vn/api/send-otp-to-signup",
+    method: "POST",
+  },
+  verifyOtp: {
+    url: "https://api.domanhhung.id.vn/api/verify-otp",
+    method: "POST",
+  },
+  setPassword: {
+    url: "https://api.domanhhung.id.vn/api/set-password",
+    method: "POST",
+  },
   logout_user: {
     url: `${backendDomin}/api/userLogout`,
     method: "get",
