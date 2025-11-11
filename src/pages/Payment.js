@@ -32,7 +32,7 @@ const Payment = () => {
       .then((res) => res.json())
       .then(setProvinces)
       .finally(() => setLoading(false));
-  }, []);
+  }, [user.name]);
 
   const fetchCartItems = async () => {
     const res = await fetch(SummaryApi.addToCartProductView.url, {
