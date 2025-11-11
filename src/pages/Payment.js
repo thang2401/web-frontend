@@ -171,7 +171,7 @@ const Payment = () => {
       if (paymentMethod === "online") {
         const orderInfo = `Thanh toan DH ${userId}`;
         const payload = {
-          amount: safeTotalCost,
+          amount: safeTotalCost * 100,
           orderInfo,
           bankCode: "VNPAYQR",
         };
