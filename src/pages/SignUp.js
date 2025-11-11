@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { FaEye, FaEyeSlash } from "react-icons/fa"; // Icon mắt
 import SummaryApi from "../common";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +11,8 @@ const SignUp = () => {
     password: "",
     confirmPassword: "",
   });
+  const [showPassword, setShowPassword] = useState(false); // Quản lý hiển thị mật khẩu
+  const [showConfirm, setShowConfirm] = useState(false);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -19,11 +22,9 @@ const SignUp = () => {
   const handleChange = (e) =>
     setUserData({ ...userData, [e.target.name]: e.target.value });
 
-  // 📧 Gửi OTP
   const handleSendOTP = async (e) => {
     e.preventDefault();
     if (!userData.email) return toast.error("Vui lòng nhập Email trước.");
-
     setLoading(true);
     try {
       const res = await fetch(SummaryApi.sendOtpToSignUp.url, {
@@ -33,7 +34,6 @@ const SignUp = () => {
       });
       const result = await res.json();
       setLoading(false);
-
       if (result.success) {
         toast.success(result.message);
         setUserId(result.userId);
@@ -45,14 +45,12 @@ const SignUp = () => {
     }
   };
 
-  // ✅ Hoàn tất đăng ký
   const handleFinalSignUp = async (e) => {
     e.preventDefault();
     if (!otpSent) return toast.error("Vui lòng gửi và nhập mã OTP.");
     if (otp.length !== 6) return toast.error("Mã OTP phải có 6 chữ số.");
     if (userData.password !== userData.confirmPassword)
       return toast.error("Mật khẩu xác nhận không khớp.");
-
     setLoading(true);
     try {
       const res = await fetch(SummaryApi.finalSignUp.url, {
@@ -62,7 +60,6 @@ const SignUp = () => {
       });
       const result = await res.json();
       setLoading(false);
-
       if (result.success) {
         toast.success("Đăng ký thành công! Đang chuyển hướng...");
         navigate("/");
@@ -124,35 +121,47 @@ const SignUp = () => {
           </div>
 
           {/* Mật khẩu */}
-          <div>
+          <div className="relative">
             <label className="block text-gray-600 font-medium mb-1">
               Mật khẩu
             </label>
             <input
               name="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Ít nhất 12 ký tự, gồm HOA, thường, số, ký tự đặc biệt"
               value={userData.password}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 pr-10"
               required
             />
+            <span
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </span>
           </div>
 
           {/* Xác nhận mật khẩu */}
-          <div>
+          <div className="relative">
             <label className="block text-gray-600 font-medium mb-1">
               Xác nhận mật khẩu
             </label>
             <input
               name="confirmPassword"
-              type="password"
+              type={showConfirm ? "text" : "password"}
               placeholder="Nhập lại mật khẩu"
               value={userData.confirmPassword}
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 pr-10"
               required
             />
+            <span
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 cursor-pointer"
+              onClick={() => setShowConfirm(!showConfirm)}
+            >
+              {showConfirm ? <FaEyeSlash /> : <FaEye />}
+            </span>
           </div>
 
           {/* Nhập OTP */}
