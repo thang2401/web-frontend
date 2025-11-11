@@ -37,7 +37,7 @@ const Payment = () => {
     const res = await fetch(SummaryApi.addToCartProductView.url, {
       method: SummaryApi.addToCartProductView.method,
       credentials: "include",
-      headers: { "content-type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
     const result = await res.json();
     if (result.success) setCartItems(result.data || []);
@@ -88,7 +88,6 @@ const Payment = () => {
     0
   );
 
-  // 🌟 HÀM THANH TOÁN (đẹp + có loading)
   const handlePayment = async (e) => {
     e.preventDefault();
 
@@ -152,10 +151,17 @@ const Payment = () => {
         didOpen: () => Swal.showLoading(),
       });
 
+      const formattedItems = cartItems.map((item) => ({
+        productId: item.productId._id,
+        quantity: item.quantity,
+        price: item.productId.sellingPrice,
+      }));
+
       const paymentData = {
-        ...formData,
+        name: formData.name,
+        phone: formData.phone,
         address: fullAddress,
-        items: cartItems,
+        items: formattedItems,
         userId,
         paymentMethod,
         totalCost,
@@ -179,41 +185,56 @@ const Payment = () => {
         return;
       }
 
-      const payment = await fetch(SummaryApi.processPayment.url, {
+      const token = localStorage.getItem("token");
+      const paymentRes = await fetch(SummaryApi.processPayment.url, {
         method: SummaryApi.processPayment.method,
         credentials: "include",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(paymentData),
       });
 
-      const paymentResult = await payment.json();
-      if (!paymentResult.success) {
+      let paymentResult;
+      try {
+        paymentResult = await paymentRes.json();
+      } catch (err) {
+        console.error("❌ Lỗi parse JSON từ server:", err);
         Swal.close();
         return Swal.fire(
-          "❌ Lỗi",
-          "Không thể lưu đơn hàng. Vui lòng thử lại.",
+          "❌ Lỗi server",
+          "Server trả về dữ liệu không hợp lệ.",
           "error"
         );
       }
 
-      const clear = await fetch(SummaryApi.cleanCart.url, {
+      if (!paymentResult.success) {
+        Swal.close();
+        return Swal.fire(
+          "❌ Lỗi",
+          paymentResult.message || "Không thể lưu đơn hàng.",
+          "error"
+        );
+      }
+
+      const clearRes = await fetch(SummaryApi.cleanCart.url, {
         method: SummaryApi.cleanCart.method,
         credentials: "include",
-        headers: { "content-type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId }),
       });
-
-      const clearResult = await clear.json();
+      const clearResult = await clearRes.json();
       Swal.close();
 
       if (clearResult.success) {
         await Swal.fire("🎉 Thành công!", "Đặt hàng thành công!", "success");
         setCartItems([]);
-        navigate("/");
         context.setCartProductCount(0);
+        navigate("/");
       }
     } catch (err) {
-      console.error(err);
+      console.error("❌ Lỗi hệ thống:", err);
       Swal.close();
       Swal.fire("⚠️ Lỗi hệ thống", "Vui lòng thử lại sau.", "error");
     }
