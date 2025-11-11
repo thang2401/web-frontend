@@ -21,6 +21,8 @@ import SetPassword from "../pages/SetPassword";
 import Qr from "../pages/Qr";
 import TwoFAVerify from "../pages/TwoFAVerify"; // Cần tạo component này
 import TwoFASetup from "../pages/TwoFASetup"; // Cần tạo component này
+import PaymentSuccess from "../pages/PaymentSuccess";
+import PaymentFailed from "../pages/PaymentFailed";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -41,6 +43,14 @@ const router = createBrowserRouter([
       {
         path: "login",
         element: <Login />,
+      },
+      {
+        path: "payment-success",
+        element: <PaymentSuccess />,
+      },
+      {
+        path: "payment-failed",
+        element: <PaymentFailed />,
       },
       {
         path: "payment",
