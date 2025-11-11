@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import Context from "../context";
-import SummaryApi from "../common"; // Chắc chắn có endpoint vnpayCreatePaymentUrl & processPayment
+import SummaryApi from "../common"; // endpoint vnpayCreatePaymentUrl & processPayment
 import displayINRCurrency from "../helpers/displayCurrency";
 import Swal from "sweetalert2";
 
@@ -23,7 +23,6 @@ const Payment = () => {
   const userId = user?._id;
   const navigate = useNavigate();
 
-  // Load thông tin user & cart + provinces
   useEffect(() => {
     if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
     setLoading(true);
@@ -44,7 +43,6 @@ const Payment = () => {
     if (result.success) setCartItems(result.data || []);
   };
 
-  // Fetch districts & wards
   useEffect(() => {
     if (province) {
       fetch(`https://provinces.open-api.vn/api/p/${province}?depth=2`)
@@ -171,19 +169,34 @@ const Payment = () => {
       };
 
       if (paymentMethod === "online") {
-        // Tạo URL VNPay
         const orderInfo = `Thanh toan DH ${userId}`;
+        const payload = {
+          amount: safeTotalCost,
+          orderInfo,
+          bankCode: "VNPAYQR",
+        };
+
+        // Hiển thị debug payload
+        console.log("Payload VNPay:", payload);
+        Swal.fire({
+          title: "Debug dữ liệu VNPay",
+          html: `<pre style="text-align:left;">${JSON.stringify(
+            payload,
+            null,
+            2
+          )}</pre>`,
+          width: 600,
+        });
+
         const res = await fetch(SummaryApi.vnpayCreatePaymentUrl.url, {
           method: SummaryApi.vnpayCreatePaymentUrl.method,
           credentials: "include",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            amount: safeTotalCost,
-            orderInfo,
-            bankCode: "VNPAYQR",
-          }),
+          body: JSON.stringify(payload),
         });
         const result = await res.json();
+        console.log("Response VNPay:", result);
+
         Swal.close();
         if (result.paymentUrl) window.location.href = result.paymentUrl;
         else
@@ -193,7 +206,6 @@ const Payment = () => {
             "error"
           );
       } else {
-        // COD: gửi đơn lên backend
         const res = await fetch(SummaryApi.processPayment.url, {
           method: SummaryApi.processPayment.method,
           credentials: "include",
