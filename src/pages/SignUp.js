@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import SummaryApi from "../common";
 
 const SignUp = () => {
-  const [step, setStep] = useState(1); // Bước 1: Gửi OTP, Bước 2: Hoàn tất
+  const [step, setStep] = useState(1); // 1: Gửi OTP, 2: Hoàn tất
   const [userData, setUserData] = useState({
     name: "",
     email: "",
@@ -21,6 +21,13 @@ const SignUp = () => {
 
   const handleChange = (e) =>
     setUserData({ ...userData, [e.target.name]: e.target.value });
+
+  // Validate password mạnh
+  const isStrongPassword = (password) => {
+    return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&()[\]{}^#<>]).{12,}$/.test(
+      password
+    );
+  };
 
   // --- Gửi OTP ---
   const handleSendOTP = async (e) => {
@@ -38,7 +45,7 @@ const SignUp = () => {
       if (data.success) {
         toast.success(data.message);
         setUserId(data.userId);
-        setStep(2); // Chuyển sang bước nhập OTP + info
+        setStep(2);
       } else {
         toast.error(data.message);
       }
@@ -51,12 +58,21 @@ const SignUp = () => {
   // --- Hoàn tất đăng ký ---
   const handleFinalSignUp = async (e) => {
     e.preventDefault();
+    if (!otp || otp.length !== 6) {
+      return toast.error("Mã OTP phải có 6 chữ số");
+    }
+    if (!userData.name) {
+      return toast.error("Vui lòng nhập họ và tên");
+    }
     if (userData.password !== userData.confirmPassword) {
       return toast.error("Mật khẩu xác nhận không khớp");
     }
-    if (otp.length !== 6) {
-      return toast.error("Mã OTP phải có 6 chữ số");
+    if (!isStrongPassword(userData.password)) {
+      return toast.error(
+        "Mật khẩu phải có ít nhất 12 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt"
+      );
     }
+
     setLoading(true);
     try {
       const res = await fetch(SummaryApi.finalSignUp.url, {
@@ -68,7 +84,7 @@ const SignUp = () => {
       setLoading(false);
       if (data.success) {
         toast.success("Đăng ký thành công! Chuyển hướng...");
-        navigate("/"); // hoặc /login
+        navigate("/login");
       } else {
         toast.error(data.message);
       }
@@ -98,6 +114,7 @@ const SignUp = () => {
                 onChange={handleChange}
                 placeholder="Nhập email của bạn"
                 required
+                autoComplete="email"
                 className="w-full p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
             </div>
@@ -138,6 +155,7 @@ const SignUp = () => {
                 onChange={handleChange}
                 placeholder="Ít nhất 12 ký tự, gồm HOA, thường, số, ký tự đặc biệt"
                 required
+                autoComplete="new-password"
                 className="w-full p-3 border rounded-xl pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
               <span
@@ -159,6 +177,7 @@ const SignUp = () => {
                 onChange={handleChange}
                 placeholder="Nhập lại mật khẩu"
                 required
+                autoComplete="new-password"
                 className="w-full p-3 border rounded-xl pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
               <span
