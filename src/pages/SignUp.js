@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import SummaryApi from "../common";
 
 const SignUp = () => {
   const [step, setStep] = useState(1); // Bước 1: Gửi OTP, Bước 2: Hoàn tất
@@ -27,8 +28,8 @@ const SignUp = () => {
     if (!userData.email) return toast.error("Vui lòng nhập Email");
     setLoading(true);
     try {
-      const res = await fetch("/api/send-otp-to-signup", {
-        method: "POST",
+      const res = await fetch(SummaryApi.sendOtpToSignUp.url, {
+        method: SummaryApi.sendOtpToSignUp.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userData.email }),
       });
@@ -58,8 +59,8 @@ const SignUp = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/final-signup", {
-        method: "POST",
+      const res = await fetch(SummaryApi.finalSignUp.url, {
+        method: SummaryApi.finalSignUp.method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...userData, otp, userId }),
       });
