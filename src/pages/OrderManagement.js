@@ -6,22 +6,22 @@ const OrderManagement = () => {
   const [loadingButtons, setLoadingButtons] = useState({}); // lưu trạng thái nút đang bấm
 
   // Lấy tất cả đơn hàng
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const res = await fetch("https://api.domanhhung.id.vn/api/orders"); // không cần token
-        const data = await res.json();
+  const fetchOrders = async () => {
+    try {
+      const res = await fetch("https://api.domanhhung.id.vn/api/orders");
+      const data = await res.json();
 
-        if (data.success && Array.isArray(data.data)) {
-          setOrders(data.data);
-        } else {
-          console.warn("⚠ Dữ liệu không hợp lệ:", data);
-        }
-      } catch (err) {
-        console.error("❌ Lỗi khi lấy đơn hàng:", err);
+      if (data.success && Array.isArray(data.data)) {
+        setOrders(data.data);
+      } else {
+        console.warn("⚠ Dữ liệu không hợp lệ:", data);
       }
-    };
+    } catch (err) {
+      console.error("❌ Lỗi khi lấy đơn hàng:", err);
+    }
+  };
 
+  useEffect(() => {
     fetchOrders();
   }, []);
 
@@ -51,6 +51,36 @@ const OrderManagement = () => {
     } catch (err) {
       console.error("❌ Lỗi khi cập nhật trạng thái:", err);
       alert("Lỗi khi cập nhật trạng thái!");
+    } finally {
+      setLoadingButtons((prev) => ({ ...prev, [orderId]: false }));
+    }
+  };
+
+  // Xóa đơn hàng
+  const deleteOrder = async (orderId) => {
+    const confirmDelete = window.confirm("Bạn có chắc muốn xóa đơn hàng này?");
+    if (!confirmDelete) return;
+
+    setLoadingButtons((prev) => ({ ...prev, [orderId]: true }));
+
+    try {
+      const res = await fetch(
+        `https://api.domanhhung.id.vn/api/orders/${orderId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const data = await res.json();
+
+      if (data.success) {
+        alert("✅ Đã xóa đơn hàng!");
+        fetchOrders();
+      } else {
+        alert("⚠ " + data.message);
+      }
+    } catch (err) {
+      console.error("❌ Lỗi khi xóa đơn hàng:", err);
+      alert("Lỗi khi xóa đơn hàng!");
     } finally {
       setLoadingButtons((prev) => ({ ...prev, [orderId]: false }));
     }
@@ -92,27 +122,31 @@ const OrderManagement = () => {
                 key={order._id}
                 className="bg-white shadow-md rounded-xl p-5 border border-gray-200 hover:shadow-lg transition"
               >
+                {/* Thông tin đơn hàng */}
                 <div className="mb-4">
                   <h3 className="text-lg font-semibold text-gray-800">
                     📦 Đơn hàng #{order._id.slice(-6)}
                   </h3>
                   <p className="text-sm text-gray-500">
                     Thời gian:{" "}
-                    {new Date(order.createdAt).toLocaleString("vi-VN", {
-                      timeZone: "Asia/Ho_Chi_Minh",
-                    })}
+                    {order.createdAt
+                      ? new Date(order.createdAt).toLocaleString("vi-VN", {
+                          timeZone: "Asia/Ho_Chi_Minh",
+                        })
+                      : "-"}
                   </p>
                 </div>
 
+                {/* Thông tin khách hàng */}
                 <div className="space-y-1 text-sm text-gray-700">
                   <p>
-                    <strong>👤 Tên:</strong> {order.name}
+                    <strong>👤 Tên:</strong> {order.name || "-"}
                   </p>
                   <p>
-                    <strong>📞 SĐT:</strong> {order.phone}
+                    <strong>📞 SĐT:</strong> {order.phone || "-"}
                   </p>
                   <p>
-                    <strong>📍 Địa chỉ:</strong> {order.address}
+                    <strong>📍 Địa chỉ:</strong> {order.address || "-"}
                   </p>
                   <p>
                     <strong>🔖 Trạng thái:</strong>{" "}
@@ -134,6 +168,7 @@ const OrderManagement = () => {
                   </p>
                 </div>
 
+                {/* Sản phẩm */}
                 <div className="mt-4">
                   <h4 className="font-semibold text-gray-800 mb-1">
                     🛍️ Sản phẩm:
@@ -160,7 +195,8 @@ const OrderManagement = () => {
                   </ul>
                 </div>
 
-                <div className="flex gap-2 mt-4">
+                {/* Nút hành động */}
+                <div className="flex gap-2 mt-4 flex-wrap">
                   {order.status === "đang chờ xử lý" && (
                     <button
                       onClick={() => updateStatus(order._id, "đã xác nhận")}
@@ -202,6 +238,17 @@ const OrderManagement = () => {
                       Đã giao
                     </button>
                   )}
+
+                  {/* Nút xóa */}
+                  <button
+                    onClick={() => deleteOrder(order._id)}
+                    disabled={isLoading}
+                    className={`px-3 py-1 rounded-md text-white bg-red-500 hover:bg-red-600 ${
+                      isLoading ? "bg-gray-400 cursor-not-allowed" : ""
+                    }`}
+                  >
+                    Xóa
+                  </button>
                 </div>
 
                 {order.status === "đã giao hàng" && (
