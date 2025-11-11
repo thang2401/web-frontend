@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import SummaryApi from "../common";
 
 const SignUp = () => {
-  const [name, setName] = useState(""); // optional at first step
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
