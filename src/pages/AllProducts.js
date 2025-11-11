@@ -8,19 +8,25 @@ const AllProducts = () => {
   const [allProduct, setAllProduct] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Lấy danh sách sản phẩm
   const fetchAllProduct = async () => {
-    const response = await fetch(SummaryApi.allProduct.url);
-    const dataResponse = await response.json();
-
-    setAllProduct(dataResponse?.data || []);
+    try {
+      const response = await fetch(SummaryApi.allProduct.url);
+      const dataResponse = await response.json();
+      setAllProduct(dataResponse?.data || []);
+    } catch (err) {
+      console.error("Lỗi khi fetch sản phẩm:", err);
+      setAllProduct([]);
+    }
   };
 
   useEffect(() => {
     fetchAllProduct();
   }, []);
 
+  // Lọc sản phẩm theo searchTerm, an toàn với undefined
   const filteredProducts = allProduct.filter((product) =>
-    product.productName.toLowerCase().includes(searchTerm.toLowerCase())
+    (product.productName || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -28,7 +34,7 @@ const AllProducts = () => {
       <div className="bg-white py-2 px-4 flex justify-between items-center">
         <h2 className="font-bold text-lg">Tất cả sản phẩm</h2>
         <button
-          className="border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-all py-1 px-3 rounded-full "
+          className="border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-all py-1 px-3 rounded-full"
           onClick={() => setOpenUploadProduct(true)}
         >
           Thêm sản phẩm
@@ -59,15 +65,17 @@ const AllProducts = () => {
           </thead>
           <tbody>
             {filteredProducts.map((product, index) => (
-              <tr key={index} className="hover:bg-gray-50">
+              <tr key={product._id || index} className="hover:bg-gray-50">
                 <td className="border px-4 py-2">{index + 1}</td>
-                <td className="border px-4 py-2">{product.productName}</td>
-                <td className="border px-4 py-2">{product.price}₫</td>
-                <td className="border px-4 py-2">{product.category}</td>
+                <td className="border px-4 py-2">
+                  {product.productName || "-"}
+                </td>
+                <td className="border px-4 py-2">{product.price || 0}₫</td>
+                <td className="border px-4 py-2">{product.category || "-"}</td>
                 <td className="border px-4 py-2">
                   <img
-                    src={product.productImage[0]}
-                    alt={product.productName}
+                    src={product.productImage?.[0] || "/placeholder.png"}
+                    alt={product.productName || "Sản phẩm"}
                     className="w-16 h-16 object-cover rounded"
                   />
                 </td>
@@ -80,6 +88,13 @@ const AllProducts = () => {
                 </td>
               </tr>
             ))}
+            {filteredProducts.length === 0 && (
+              <tr>
+                <td colSpan="6" className="text-center py-4">
+                  Không tìm thấy sản phẩm
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

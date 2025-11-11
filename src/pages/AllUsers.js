@@ -1,3 +1,4 @@
+// frontend/src/pages/AllUsers.js
 import React, { useEffect, useState } from "react";
 import SummaryApi from "../common";
 import { toast } from "react-toastify";
@@ -6,7 +7,7 @@ import { MdModeEdit, MdDelete } from "react-icons/md";
 import ChangeUserRole from "../components/ChangeUserRole";
 
 const AllUsers = () => {
-  const [allUser, setAllUsers] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [openUpdateRole, setOpenUpdateRole] = useState(false);
   const [updateUserDetails, setUpdateUserDetails] = useState({
@@ -16,20 +17,22 @@ const AllUsers = () => {
     _id: "",
   });
 
+  // Fetch tất cả user
   const fetchAllUsers = async () => {
-    const fetchData = await fetch(SummaryApi.allUser.url, {
-      method: SummaryApi.allUser.method,
-      credentials: "include",
-    });
-
-    const dataResponse = await fetchData.json();
-
-    if (dataResponse.success) {
-      setAllUsers(dataResponse.data);
-    }
-
-    if (dataResponse.error) {
-      toast.error(dataResponse.message);
+    try {
+      const res = await fetch(SummaryApi.allUser.url, {
+        method: SummaryApi.allUser.method,
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAllUsers(data.data || []);
+      } else {
+        toast.error(data.message || "Không lấy được dữ liệu người dùng");
+      }
+    } catch (err) {
+      toast.error("Lỗi server khi lấy danh sách người dùng");
+      console.error(err);
     }
   };
 
@@ -37,90 +40,114 @@ const AllUsers = () => {
     fetchAllUsers();
   }, []);
 
+  // Xóa user
   const handleDeleteUser = async (userId) => {
-    const confirmDelete = window.confirm(
-      "Bạn có chắc muốn xóa người dùng này?"
-    );
-    if (!confirmDelete) return;
+    if (!window.confirm("Bạn có chắc muốn xóa người dùng này?")) return;
 
     try {
-      const response = await fetch(`${SummaryApi.deleteUser.url}/${userId}`, {
+      const res = await fetch(`${SummaryApi.deleteUser.url}/${userId}`, {
         method: SummaryApi.deleteUser.method,
         credentials: "include",
       });
-
-      const data = await response.json();
-
+      const data = await res.json();
       if (data.success) {
         toast.success("Đã xóa người dùng!");
         fetchAllUsers();
+      } else {
+        toast.error(data.message || "Xóa thất bại");
       }
     } catch (err) {
-      toast.error("Lỗi hệ thống khi xóa người dùng");
+      toast.error("Lỗi server khi xóa người dùng");
+      console.error(err);
     }
   };
 
-  const filteredUsers = allUser.filter(
+  // Filter search an toàn
+  const filteredUsers = allUsers.filter(
     (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (user.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.email || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="bg-white pb-4">
-      <div className="p-4">
+    <div className="min-h-screen bg-gray-50 p-4">
+      <h1 className="text-3xl font-bold mb-4">Danh sách người dùng</h1>
+
+      {/* Tìm kiếm */}
+      <div className="mb-4">
         <input
           type="text"
           placeholder="Tìm kiếm theo tên hoặc email..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md"
+          className="w-full md:w-1/2 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
         />
       </div>
 
-      <table className="w-full userTable">
-        <thead>
-          <tr className="bg-black text-white">
-            <th>STT</th>
-            <th>Tên</th>
-            <th>Email</th>
-            <th>Vai trò</th>
-            <th>Ngày tạo</th>
-            <th>Chức năng</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredUsers.map((el, index) => (
-            <tr key={index}>
-              <td>{index + 1}</td>
-              <td>{el?.name}</td>
-              <td>{el?.email}</td>
-              <td>{el?.role}</td>
-              <td>{moment(el?.createdAt).format("LL")}</td>
-              <td className="flex gap-2 items-center justify-center">
-                <button
-                  className="bg-green-100 p-2 rounded-full hover:bg-green-500 hover:text-white"
-                  onClick={() => {
-                    setUpdateUserDetails(el);
-                    setOpenUpdateRole(true);
-                  }}
-                  title="Chỉnh sửa vai trò"
-                >
-                  <MdModeEdit />
-                </button>
-                <button
-                  className="bg-red-100 p-2 rounded-full hover:bg-red-600 hover:text-white"
-                  onClick={() => handleDeleteUser(el._id)}
-                  title="Xóa người dùng"
-                >
-                  <MdDelete />
-                </button>
-              </td>
+      {/* Bảng người dùng */}
+      <div className="overflow-x-auto">
+        <table className="w-full table-auto border-collapse border border-gray-300">
+          <thead>
+            <tr className="bg-indigo-600 text-white">
+              <th className="p-2 border">STT</th>
+              <th className="p-2 border">Tên</th>
+              <th className="p-2 border">Email</th>
+              <th className="p-2 border">Vai trò</th>
+              <th className="p-2 border">Ngày tạo</th>
+              <th className="p-2 border">Chức năng</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((user, index) => (
+                <tr
+                  key={user._id || index}
+                  className="even:bg-gray-100 hover:bg-gray-200"
+                >
+                  <td className="p-2 border text-center">{index + 1}</td>
+                  <td className="p-2 border">{user.name || "-"}</td>
+                  <td className="p-2 border">{user.email || "-"}</td>
+                  <td className="p-2 border text-center">
+                    {user.role || "GENERAL"}
+                  </td>
+                  <td className="p-2 border text-center">
+                    {user.createdAt
+                      ? moment(user.createdAt).format("DD/MM/YYYY")
+                      : "-"}
+                  </td>
+                  <td className="p-2 border flex justify-center gap-2">
+                    <button
+                      className="bg-green-100 p-2 rounded-full hover:bg-green-500 hover:text-white transition"
+                      onClick={() => {
+                        setUpdateUserDetails(user);
+                        setOpenUpdateRole(true);
+                      }}
+                      title="Chỉnh sửa vai trò"
+                    >
+                      <MdModeEdit size={20} />
+                    </button>
+                    <button
+                      className="bg-red-100 p-2 rounded-full hover:bg-red-600 hover:text-white transition"
+                      onClick={() => handleDeleteUser(user._id)}
+                      title="Xóa người dùng"
+                    >
+                      <MdDelete size={20} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="text-center p-4 text-gray-500">
+                  Không có người dùng
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
+      {/* Modal chỉnh vai trò */}
       {openUpdateRole && (
         <ChangeUserRole
           onClose={() => setOpenUpdateRole(false)}
