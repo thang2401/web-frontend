@@ -181,7 +181,7 @@ const Payment = () => {
           body: JSON.stringify({
             amount: totalCost,
             orderInfo: orderInfo,
-            bankCode: "VNPAYQR",
+            // bankCode: "VNPAYQR",
           }),
         });
 
