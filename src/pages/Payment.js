@@ -4,13 +4,12 @@ import { useNavigate } from "react-router-dom";
 import Context from "../context";
 import SummaryApi from "../common";
 import displayINRCurrency from "../helpers/displayCurrency";
-import Swal from "sweetalert2";
 
 const Payment = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ name: "", phone: "" });
-  const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [paymentMethod, setPaymentMethod] = useState("cod"); // COD mặc định
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
@@ -23,26 +22,29 @@ const Payment = () => {
   const userId = user?._id;
   const navigate = useNavigate();
 
+  // 🧭 Lấy thông tin giỏ hàng + danh sách tỉnh
   useEffect(() => {
     if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
+
     setLoading(true);
     fetchCartItems();
     fetch("https://provinces.open-api.vn/api/p/")
       .then((res) => res.json())
       .then(setProvinces)
       .finally(() => setLoading(false));
-  }, [user.name]);
+  }, []);
 
   const fetchCartItems = async () => {
     const res = await fetch(SummaryApi.addToCartProductView.url, {
       method: SummaryApi.addToCartProductView.method,
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "content-type": "application/json" },
     });
     const result = await res.json();
     if (result.success) setCartItems(result.data || []);
   };
 
+  // 🧭 Load quận, huyện, phường
   useEffect(() => {
     if (province) {
       fetch(`https://provinces.open-api.vn/api/p/${province}?depth=2`)
@@ -88,29 +90,15 @@ const Payment = () => {
     0
   );
 
+  // 🧾 Xử lý thanh toán
   const handlePayment = async (e) => {
     e.preventDefault();
 
-    if (!userId)
-      return Swal.fire(
-        "⚠️ Thông báo",
-        "Vui lòng đăng nhập để thanh toán.",
-        "warning"
-      );
-
+    if (!userId) return alert("Vui lòng đăng nhập để thanh toán.");
     if (!province || !district || !ward)
-      return Swal.fire(
-        "⚠️ Thiếu thông tin",
-        "Vui lòng chọn đầy đủ địa chỉ.",
-        "warning"
-      );
-
+      return alert("Vui lòng chọn đầy đủ địa chỉ.");
     if (!validatePhone(formData.phone))
-      return Swal.fire(
-        "📞 Lỗi số điện thoại",
-        "Số điện thoại không hợp lệ.",
-        "error"
-      );
+      return alert("Số điện thoại không hợp lệ.");
 
     const wardObj = wards.find((w) => String(w.code) === String(ward));
     const districtObj = districts.find(
@@ -121,125 +109,78 @@ const Payment = () => {
     );
     const fullAddress = `${wardObj?.name}, ${districtObj?.name}, ${provinceObj?.name}`;
 
-    const { isConfirmed } = await Swal.fire({
-      title: "Xác nhận thanh toán",
-      html: `
-        <div style="text-align:left; font-size:15px;">
-          <p><b>Tổng tiền:</b> ${displayINRCurrency(totalCost)}</p>
-          <p><b>Phương thức:</b> ${
-            paymentMethod === "cod"
-              ? "Thanh toán khi nhận hàng"
-              : "Thanh toán online"
-          }</p>
-          <p><b>Địa chỉ:</b> ${fullAddress}</p>
-        </div>
-      `,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "✅ Xác nhận",
-      cancelButtonText: "❌ Hủy",
-      reverseButtons: true,
-    });
-
-    if (!isConfirmed) return;
+    const confirmCheckout = window.confirm(
+      `Xác nhận thanh toán ${displayINRCurrency(totalCost)}?\nPhương thức: ${
+        paymentMethod === "cod"
+          ? "Thanh toán khi nhận hàng"
+          : "Thanh toán online"
+      }\nĐịa chỉ: ${fullAddress}`
+    );
+    if (!confirmCheckout) return;
 
     try {
-      Swal.fire({
-        title: "Đang xử lý thanh toán...",
-        text: "Vui lòng chờ trong giây lát.",
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading(),
-      });
-
-      const formattedItems = cartItems.map((item) => ({
-        productId: item.productId._id,
-        quantity: item.quantity,
-        price: item.productId.sellingPrice,
-      }));
-
       const paymentData = {
-        name: formData.name,
-        phone: formData.phone,
+        ...formData,
         address: fullAddress,
-        items: formattedItems,
+        items: cartItems,
         userId,
         paymentMethod,
         totalCost,
       };
 
       if (paymentMethod === "online") {
+        // Chuẩn bị nội dung chuyển khoản
         const productNames = cartItems
           .map((item) => item.productId.productName)
           .join(", ");
-        Swal.close();
+
+        // Chuyển hướng sang trang QR, gửi dữ liệu
         navigate("/qr-payment", {
           state: {
             name: formData.name,
             phone: formData.phone,
-            address: fullAddress,
+            address: `${wardObj?.name}, ${districtObj?.name}, ${provinceObj?.name}`,
             totalCost,
             products: productNames,
-            orderId: Math.floor(Math.random() * 1000000),
+            orderId: Math.floor(Math.random() * 1000000), // mã đơn ngẫu nhiên
           },
         });
         return;
       }
 
-      const token = localStorage.getItem("token");
-      const paymentRes = await fetch(SummaryApi.processPayment.url, {
+      // Gửi thông tin đơn hàng
+      const payment = await fetch(SummaryApi.processPayment.url, {
         method: SummaryApi.processPayment.method,
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify(paymentData),
       });
 
-      let paymentResult;
-      try {
-        paymentResult = await paymentRes.json();
-      } catch (err) {
-        console.error("❌ Lỗi parse JSON từ server:", err);
-        Swal.close();
-        return Swal.fire(
-          "❌ Lỗi server",
-          "Server trả về dữ liệu không hợp lệ.",
-          "error"
-        );
-      }
+      const paymentResult = await payment.json();
+      if (!paymentResult.success) return alert("Lỗi khi lưu đơn hàng.");
 
-      if (!paymentResult.success) {
-        Swal.close();
-        return Swal.fire(
-          "❌ Lỗi",
-          paymentResult.message || "Không thể lưu đơn hàng.",
-          "error"
-        );
-      }
-
-      const clearRes = await fetch(SummaryApi.cleanCart.url, {
+      // Xóa giỏ hàng
+      const clear = await fetch(SummaryApi.cleanCart.url, {
         method: SummaryApi.cleanCart.method,
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({ userId }),
       });
-      const clearResult = await clearRes.json();
-      Swal.close();
 
+      const clearResult = await clear.json();
       if (clearResult.success) {
-        await Swal.fire("🎉 Thành công!", "Đặt hàng thành công!", "success");
+        alert("✅ Đặt hàng thành công!");
         setCartItems([]);
-        context.setCartProductCount(0);
         navigate("/");
+        context.setCartProductCount(0);
       }
     } catch (err) {
-      console.error("❌ Lỗi hệ thống:", err);
-      Swal.close();
-      Swal.fire("⚠️ Lỗi hệ thống", "Vui lòng thử lại sau.", "error");
+      console.error(err);
+      alert("Lỗi hệ thống khi thanh toán. Vui lòng thử lại.");
     }
   };
 
+  // 🎨 Giao diện
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-10 px-4">
       <button
@@ -259,6 +200,7 @@ const Payment = () => {
           <h2 className="text-2xl font-semibold text-red-600 mb-5 border-b pb-3">
             Tóm Tắt Đơn Hàng
           </h2>
+
           {loading ? (
             <div className="text-center text-gray-500 animate-pulse">
               Đang tải...
@@ -311,6 +253,7 @@ const Payment = () => {
           </h2>
 
           <form onSubmit={handlePayment} className="space-y-5">
+            {/* Họ tên */}
             <div>
               <label className="block mb-1 font-medium text-gray-700">
                 Họ và tên
@@ -325,6 +268,7 @@ const Payment = () => {
               />
             </div>
 
+            {/* Số điện thoại (kiểm tra hợp lệ) */}
             <div>
               <label className="block mb-1 font-medium text-gray-700">
                 Số điện thoại
@@ -349,6 +293,7 @@ const Payment = () => {
               />
             </div>
 
+            {/* Địa chỉ */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <select
                 value={province}
@@ -393,6 +338,7 @@ const Payment = () => {
               </select>
             </div>
 
+            {/* Chọn phương thức thanh toán */}
             <div>
               <label className="block mb-2 font-medium text-gray-700">
                 Phương thức thanh toán
@@ -424,6 +370,7 @@ const Payment = () => {
               </div>
             </div>
 
+            {/* Nút xác nhận */}
             <button
               type="submit"
               className="w-full mt-6 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition duration-200"
