@@ -3,14 +3,17 @@ import React, { useEffect, useState } from "react";
 const OrderManagement = () => {
   const [orders, setOrders] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loadingButtons, setLoadingButtons] = useState({}); // lưu trạng thái nút đang bấm
+  const [loadingButtons, setLoadingButtons] = useState({}); // trạng thái nút đang bấm
 
   // Lấy tất cả đơn hàng
   const fetchOrders = async () => {
     try {
-      const res = await fetch("https://api.domanhhung.id.vn/api/orders");
+      const res = await fetch("https://api.domanhhung.id.vn/api/orders", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
       const data = await res.json();
-
       if (data.success && Array.isArray(data.data)) {
         setOrders(data.data);
       } else {
@@ -33,12 +36,14 @@ const OrderManagement = () => {
         `https://api.domanhhung.id.vn/api/orders/${orderId}/status`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
           body: JSON.stringify({ status: newStatus }),
         }
       );
       const data = await res.json();
-
       if (data.success) {
         setOrders((prev) =>
           prev.map((order) =>
@@ -56,7 +61,7 @@ const OrderManagement = () => {
     }
   };
 
-  // Xóa đơn hàng
+  // Xóa đơn hàng (chỉ admin)
   const deleteOrder = async (orderId) => {
     const confirmDelete = window.confirm("Bạn có chắc muốn xóa đơn hàng này?");
     if (!confirmDelete) return;
@@ -65,13 +70,16 @@ const OrderManagement = () => {
 
     try {
       const res = await fetch(
-        `https://api.domanhhung.id.vn/api/orders/${orderId}`,
+        `https://api.domanhhung.id.vn/api/delete-orders/${orderId}`,
         {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
         }
       );
       const data = await res.json();
-
       if (data.success) {
         alert("✅ Đã xóa đơn hàng!");
         fetchOrders();
@@ -99,9 +107,10 @@ const OrderManagement = () => {
   return (
     <div className="p-6 bg-gray-100 min-h-screen">
       <h2 className="text-2xl font-bold mb-4 text-blue-600">
-        🛒 Quản lý đơn hàng
+        🛒 Quản lý đơn hàng (Admin)
       </h2>
 
+      {/* Input tìm kiếm */}
       <input
         type="text"
         placeholder="🔍 Tìm kiếm theo tên, số điện thoại, địa chỉ, mã đơn..."
@@ -116,7 +125,6 @@ const OrderManagement = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredOrders.map((order) => {
             const isLoading = loadingButtons[order._id];
-
             return (
               <div
                 key={order._id}
