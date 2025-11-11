@@ -132,8 +132,9 @@ const SummaryApi = {
     url: `${backendDomin}/api/orders`,
     method: "DELETE",
   },
+
   vnpayCreatePaymentUrl: {
-    url: `${backendDomin}/api/vnpay/create_payment_url`,
+    url: `${backendDomin}/api/payment/create_payment_url`,
     method: "POST",
   },
   // Password & Admin
