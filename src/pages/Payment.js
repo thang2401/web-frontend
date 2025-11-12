@@ -169,11 +169,11 @@ const Payment = () => {
       };
 
       if (paymentMethod === "online") {
-        const orderInfo = `Thanh toan DH ${userId}`;
+        // const orderInfo = `Thanh toan DH ${userId}`;
         const payload = {
           amount: safeTotalCost * 100,
-          orderInfo,
-          bankCode: "VNPAYQR",
+          // orderInfo,
+          // bankCode: "VNPAYQR",
         };
 
         // Hiển thị debug payload
