@@ -20,6 +20,7 @@ const ForgotPassword = () => {
 
   // 📨 Gửi OTP
   const handleSendOTP = async (e) => {
+    e.preventDefault();
     const res = await fetch(SummaryApi.forgotPassword.url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
