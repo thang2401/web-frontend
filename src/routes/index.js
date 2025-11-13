@@ -23,6 +23,7 @@ import TwoFAVerify from "../pages/TwoFAVerify"; // Cần tạo component này
 import TwoFASetup from "../pages/TwoFASetup"; // Cần tạo component này
 import PaymentSuccess from "../pages/PaymentSuccess";
 import PaymentFailed from "../pages/PaymentFailed";
+import PrivacyPolicy from "../components/PrivacyPolicy";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -35,6 +36,11 @@ const router = createBrowserRouter([
       {
         path: "admin-panel/2fa-setup", // Trang cấu hình 2FA lần đầu cho Admin
         element: <TwoFASetup />,
+      },
+
+      {
+        path: "privacy-policy", // Trang cấu hình 2FA lần đầu cho Admin
+        element: <PrivacyPolicy />,
       },
       {
         path: "",
