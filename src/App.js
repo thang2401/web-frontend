@@ -73,6 +73,7 @@ function App() {
     "/forgot-password",
     "/chang-password",
     "/myoder",
+    "/privacy-policy",
   ];
 
   // Routes chỉ ẩn Footer (ví dụ OrderManagement)
