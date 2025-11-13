@@ -39,7 +39,7 @@ const router = createBrowserRouter([
       },
 
       {
-        path: "privacy-policy", // Trang cấu hình 2FA lần đầu cho Admin
+        path: "privacy-policy",
         element: <PrivacyPolicy />,
       },
       {
