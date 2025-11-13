@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false); // ✅ state checkbox
   const [data, setData] = useState({
     email: "",
     password: "",
@@ -33,6 +34,11 @@ const SignUp = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!agreeTerms) {
+      toast.error("Vui lòng đồng ý điều khoản bảo mật trước khi đăng ký!");
+      return;
+    }
+
     if (data.password !== data.confirmPassword) {
       toast.error("Vui lòng xem lại mật khẩu");
       return;
@@ -79,6 +85,7 @@ const SignUp = () => {
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
+          {/* Họ và tên */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
               Họ và tên:
@@ -94,6 +101,7 @@ const SignUp = () => {
             />
           </div>
 
+          {/* Email */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
               Email:
@@ -109,6 +117,7 @@ const SignUp = () => {
             />
           </div>
 
+          {/* Mật khẩu */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
               Mật khẩu:
@@ -132,6 +141,7 @@ const SignUp = () => {
             </div>
           </div>
 
+          {/* Xác nhận mật khẩu */}
           <div>
             <label className="block text-sm font-medium mb-1 text-gray-700">
               Xác nhận mật khẩu:
@@ -155,11 +165,37 @@ const SignUp = () => {
             </div>
           </div>
 
+          {/* Checkbox điều khoản */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="agreeTerms"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+              className="w-4 h-4 accent-red-500"
+            />
+            <label htmlFor="agreeTerms" className="text-sm text-gray-700">
+              Tôi đồng ý với{" "}
+              <Link
+                to="/privacy-policy"
+                className="text-red-600 hover:underline"
+              >
+                điều khoản bảo mật
+              </Link>
+            </label>
+          </div>
+
+          {/* Button đăng ký */}
           <motion.button
             whileTap={{ scale: 0.95 }}
             whileHover={{ scale: 1.03 }}
             type="submit"
-            className="bg-gradient-to-r from-red-500 to-pink-500 text-white font-semibold py-2.5 rounded-full w-full shadow-lg hover:shadow-2xl transition-all"
+            disabled={!agreeTerms} // ✅ disabled khi chưa check
+            className={`${
+              agreeTerms
+                ? "bg-gradient-to-r from-red-500 to-pink-500 hover:shadow-2xl"
+                : "bg-gray-300 cursor-not-allowed"
+            } text-white font-semibold py-2.5 rounded-full w-full shadow-lg transition-all`}
           >
             Đăng ký
           </motion.button>
