@@ -18,8 +18,6 @@ const ChangePassword = () => {
     confirm: false,
   });
 
-  const token = localStorage.getItem("token");
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
