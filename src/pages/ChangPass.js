@@ -3,8 +3,10 @@ import { toast } from "react-toastify";
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import SummaryApi from "../common";
-
+import { useSelector } from "react-redux";
 const ChangePassword = () => {
+  const user = useSelector((state) => state?.user?.user);
+  const userId = user?._id;
   const [form, setForm] = useState({
     oldPassword: "",
     newPassword: "",
@@ -26,7 +28,7 @@ const ChangePassword = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!token) {
+    if (!userId) {
       toast.error("Bạn phải đăng nhập trước khi đổi mật khẩu");
       return;
     }
