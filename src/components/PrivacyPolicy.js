@@ -85,7 +85,7 @@ const PrivacyPolicy = () => {
 
         <div className="text-center mt-8">
           <Link
-            to="/signup"
+            to="/sign-up"
             className="text-red-600 font-semibold hover:underline"
           >
             Quay lại Đăng ký
