@@ -17,9 +17,9 @@ const Login = () => {
     twoFactorToken: "",
   });
   const [requires2FA, setRequires2FA] = useState(false);
-  
+
   // 1. Khai báo Ref cho trường 2FA
-  const tokenRef = useRef(null); 
+  const tokenRef = useRef(null);
 
   const navigate = useNavigate();
   const user = useSelector((state) => state?.user?.user);
@@ -29,7 +29,7 @@ const Login = () => {
     const { name, value } = e.target;
     setData((prev) => ({ ...prev, [name]: value }));
   };
-  
+
   // 2. useEffect để tự động focus vào trường 2FA
   useEffect(() => {
     if (requires2FA && tokenRef.current) {
@@ -72,11 +72,10 @@ const Login = () => {
       } else if (result.error && result.requires2FA) {
         // --- 2. YÊU CẦU MÃ 2FA ---
         toast.warn(result.message);
-        setRequires2FA(true); 
-        
+        setRequires2FA(true);
+
         // 3. Bổ sung: Xóa mật khẩu khỏi state khi chuyển sang bước 2FA (Tăng bảo mật)
-        setData((prev) => ({ ...prev, password: "" })); 
-        
+        setData((prev) => ({ ...prev, password: "" }));
       } else {
         // --- 3. LỖI KHÁC ---
         toast.error(result.message);
@@ -117,13 +116,13 @@ const Login = () => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          
           {/* Email & Password (Bị làm mờ và vô hiệu hóa khi 2FA được yêu cầu) */}
           <div className={requires2FA ? "opacity-50 pointer-events-none" : ""}>
-            
             {/* Email */}
             <div>
-              <label className="block mb-1 font-medium text-gray-700">Email</label>
+              <label className="block mb-1 font-medium text-gray-700">
+                Email
+              </label>
               <input
                 type="email"
                 name="email"
@@ -138,14 +137,16 @@ const Login = () => {
 
             {/* Password */}
             <div className="mt-4">
-              <label className="block mb-1 font-medium text-gray-700">Mật khẩu</label>
+              <label className="block mb-1 font-medium text-gray-700">
+                Mật khẩu
+              </label>
               <div className="flex items-center px-4 py-2 border rounded-lg shadow-sm focus-within:ring-2 focus-within:ring-red-400">
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
                   placeholder="Nhập mật khẩu..."
                   // Giữ value là data.password (hiện đã được xóa sau khi yêu cầu 2FA)
-                  value={data.password} 
+                  value={data.password}
                   onChange={handleOnChange}
                   required
                   className="w-full outline-none bg-transparent"
@@ -192,7 +193,7 @@ const Login = () => {
                 maxLength={6}
                 required
                 className="w-full px-4 py-3 border-2 border-red-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 shadow-md text-center text-lg tracking-widest"
-                ref={tokenRef} {/* <-- Áp dụng Ref để tự động focus */}
+                ref={tokenRef}
               />
             </motion.div>
           )}
