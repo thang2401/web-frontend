@@ -1,27 +1,29 @@
 import React, { useEffect, useState, useContext } from "react";
 import { useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js"; // Import PayPal Components
+// 1. IMPORT PAYPAL BUTTONS
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 import Context from "../context";
-import SummaryApi from "../common"; // Đã cập nhật endpoint paypalCreateOrder & paypalCaptureOrder
+import SummaryApi from "../common"; // Bao gồm paypalCreateOrder, paypalCaptureOrder, processPayment, deleteCart
 import displayINRCurrency from "../helpers/displayCurrency";
 import Swal from "sweetalert2";
 
-// ⚠️ CẤU HÌNH PAYPAL
-// Thay thế giá trị của "client-id" bằng biến môi trường (ví dụ: process.env.REACT_APP_PAYPAL_CLIENT_ID)
+// ⚠️ CẤU HÌNH PAYPAL: Thay thế bằng Client ID của bạn (ví dụ: trong biến môi trường)
 const initialOptions = {
-  "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID || "sb", // Sử dụng "sb" cho Sandbox nếu không có
-  currency: "USD", // Phải khớp với tiền tệ trong Order API
+  "client-id": process.env.REACT_APP_PAYPAL_CLIENT_ID || "sb", // "sb" là Sandbox
+  currency: "USD", // PHẢI DÙNG USD
   intent: "capture",
 };
+
+// Tỷ giá giả định 1 USD = 25000 VND (Sử dụng tỷ giá thực tế trong Production)
+const EXCHANGE_RATE = 25000;
 
 const Payment = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ name: "", phone: "" });
-  const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [paymentMethod, setPaymentMethod] = useState("cod"); // State quản lý địa chỉ
 
-  // State quản lý địa chỉ
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
@@ -33,9 +35,8 @@ const Payment = () => {
   const user = useSelector((state) => state?.user?.user);
   const userId = user?._id;
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation(); // --- LOGIC FETCH DỮ LIỆU VÀ ĐỊA CHỈ ---
 
-  // --- LOGIC FETCH DỮ LIỆU VÀ ĐỊA CHỈ (GIỮ NGUYÊN) ---
   useEffect(() => {
     if (user?.name) setFormData((prev) => ({ ...prev, name: user.name }));
     setLoading(true);
@@ -48,33 +49,75 @@ const Payment = () => {
   }, [user?.name]);
 
   const fetchCartItems = async () => {
-    /* ... */
-  };
-  useEffect(() => {
-    /* Fetch Districts ... */
-  }, [province]);
-  useEffect(() => {
-    /* Fetch Wards ... */
-  }, [district]);
-  const handleInputChange = (e) => {
-    /* ... */
-  };
-  const validatePhone = (phone) => /^(0[3|5|7|8|9])[0-9]{8}$/.test(phone);
+    const res = await fetch(SummaryApi.addToCartProductView.url, {
+      method: SummaryApi.addToCartProductView.method,
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+    });
+    const result = await res.json();
+    if (result.success) {
+      const validCartItems = result.data
+        ? result.data.filter((item) => item.productId)
+        : [];
+      setCartItems(validCartItems);
+    }
+  }; // Logic Fetch Districts (Quận/Huyện)
 
-  // Tính toán tổng tiền
-  const totalQuantity = cartItems.reduce((acc, item) => acc + item.quantity, 0);
-  const totalCostVND = cartItems.reduce(
+  useEffect(() => {
+    if (province) {
+      fetch(`https://provinces.open-api.vn/api/p/${province}?depth=2`)
+        .then((res) => res.json())
+        .then((data) => {
+          setDistricts(data.districts || []);
+          setWards([]);
+          setDistrict("");
+          setWard("");
+        });
+    } else {
+      setDistricts([]);
+      setWards([]);
+      setDistrict("");
+      setWard("");
+    }
+  }, [province]); // Logic Fetch Wards (Phường/Xã)
+
+  useEffect(() => {
+    if (district) {
+      fetch(`https://provinces.open-api.vn/api/d/${district}?depth=2`)
+        .then((res) => res.json())
+        .then((data) => {
+          setWards(data.wards || []);
+          setWard("");
+        });
+    } else {
+      setWards([]);
+      setWard("");
+    }
+  }, [district]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const validatePhone = (phone) => /^(0[3|5|7|8|9])[0-9]{8}$/.test(phone); // --- TÍNH TOÁN TIỀN TỆ ---
+
+  const validCartItems = cartItems.filter(
+    (item) => item.productId && item.productId.sellingPrice
+  );
+  const totalQuantity = validCartItems.reduce(
+    (acc, item) => acc + item.quantity,
+    0
+  );
+  const totalCostVND = validCartItems.reduce(
     (acc, item) => acc + item.quantity * item.productId.sellingPrice,
     0
   );
-  const safeTotalCost = Math.round(totalCostVND);
+  const safeTotalCostVND = Math.round(totalCostVND);
+  const totalCostUSD = safeTotalCostVND / EXCHANGE_RATE;
+  const totalCostUSDString = totalCostUSD.toFixed(2); // Chuỗi 2 chữ số thập phân cho PayPal
 
-  // ⚠️ CHUYỂN ĐỔI TIỀN TỆ: Tỷ giá giả định 1 USD = 25000 VND
-  const EXCHANGE_RATE = 25000;
-  const totalCostUSD = safeTotalCost / EXCHANGE_RATE;
-  const totalCostUSDString = totalCostUSD.toFixed(2); // PayPal yêu cầu chuỗi 2 chữ số thập phân
-
-  // Lấy tên địa chỉ đầy đủ
+  // Lấy địa chỉ đầy đủ
   const getFullAddress = () => {
     const wardObj = wards.find((w) => String(w.code) === String(ward));
     const districtObj = districts.find(
@@ -84,52 +127,11 @@ const Payment = () => {
       (p) => String(p.code) === String(province)
     );
     return `${wardObj?.name}, ${districtObj?.name}, ${provinceObj?.name}`;
-  };
+  }; // --- HÀM XỬ LÝ THANH TOÁN COD ---
 
-  // --- HÀM XỬ LÝ CHUNG CHO COD ---
-  const handleCODPayment = async (paymentData) => {
-    try {
-      Swal.fire({
-        title: "Đang xử lý đơn hàng...",
-        text: "Vui lòng chờ...",
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading(),
-      });
-
-      const res = await fetch(SummaryApi.processPayment.url, {
-        method: SummaryApi.processPayment.method,
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(paymentData),
-      });
-      const result = await res.json();
-      if (!result.success) throw new Error("Không thể lưu đơn hàng.");
-
-      // Xóa giỏ hàng
-      await fetch(SummaryApi.deleteCart.url, {
-        method: SummaryApi.deleteCart.method,
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      Swal.close();
-      await Swal.fire("🎉 Thành công!", "Đặt hàng COD thành công!", "success");
-      setCartItems([]);
-      context.setCartProductCount(0);
-      navigate("/");
-    } catch (err) {
-      console.error(err);
-      Swal.close();
-      Swal.fire("⚠️ Lỗi hệ thống", "Vui lòng thử lại sau.", "error");
-    }
-  };
-
-  // --- HÀM XÁC NHẬN VÀ CHUYỂN TIỀN (CHỈ DÙNG CHO COD SUBMIT) ---
-  const handleFormSubmit = async (e) => {
+  const handleCODPayment = async (e) => {
     e.preventDefault();
 
-    // 1. Kiểm tra điều kiện cần
     if (!userId)
       return Swal.fire(
         "⚠️ Thông báo",
@@ -151,12 +153,11 @@ const Payment = () => {
 
     const fullAddress = getFullAddress();
 
-    // 2. Xác nhận thông tin
     const { isConfirmed } = await Swal.fire({
       title: "Xác nhận thanh toán COD",
       html: `<div style="text-align:left; font-size:15px;"><p><b>Tổng tiền:</b> ${displayINRCurrency(
-        safeTotalCost
-      )}</p><p><b>Phương thức:</b> Thanh toán khi nhận hàng (COD)</p><p><b>Địa chỉ:</b> ${fullAddress}</p></div>`,
+        safeTotalCostVND
+      )}</p><p><b>Phương thức:</b> Thanh toán khi nhận hàng</p><p><b>Địa chỉ:</b> ${fullAddress}</p></div>`,
       icon: "question",
       showCancelButton: true,
       confirmButtonText: "✅ Xác nhận",
@@ -166,30 +167,57 @@ const Payment = () => {
 
     if (!isConfirmed) return;
 
-    // 3. Chuẩn bị Data
-    const formattedItems = cartItems.map((item) => ({
-      productId: item.productId._id,
-      name: item.productId.productName,
-      price: item.productId.sellingPrice,
-      quantity: item.quantity,
-    }));
+    try {
+      Swal.fire({
+        title: "Đang xử lý đơn hàng...",
+        text: "Vui lòng chờ...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
 
-    const paymentData = {
-      ...formData,
-      address: fullAddress,
-      items: formattedItems,
-      userId,
-      paymentMethod: "cod",
-      totalCost: safeTotalCost,
-    };
+      const formattedItems = validCartItems.map((item) => ({
+        productId: item.productId._id,
+        name: item.productId.productName,
+        price: item.productId.sellingPrice,
+        quantity: item.quantity,
+      }));
 
-    // 4. Gọi API COD
-    await handleCODPayment(paymentData);
-  };
+      const paymentData = {
+        ...formData,
+        address: fullAddress,
+        items: formattedItems,
+        userId,
+        paymentMethod: "cod",
+        totalCost: safeTotalCostVND,
+      };
 
-  // -------------------------------------------------------------
-  // --- KHỐI JSX CHÍNH ---
-  // -------------------------------------------------------------
+      const res = await fetch(SummaryApi.processPayment.url, {
+        method: SummaryApi.processPayment.method,
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(paymentData),
+      });
+      const result = await res.json();
+      if (!result.success) throw new Error("Không thể lưu đơn hàng.");
+
+      await fetch(SummaryApi.deleteCart.url, {
+        method: SummaryApi.deleteCart.method,
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      Swal.close();
+      await Swal.fire("🎉 Thành công!", "Đặt hàng COD thành công!", "success");
+      setCartItems([]);
+      context.setCartProductCount(0);
+      navigate("/");
+    } catch (err) {
+      console.error(err);
+      Swal.close();
+      Swal.fire("⚠️ Lỗi hệ thống", "Vui lòng thử lại sau.", "error");
+    }
+  }; // ------------------------------------------------------------- // --- GIAO DIỆN CHÍNH --- // -------------------------------------------------------------
 
   return (
     <PayPalScriptProvider options={initialOptions}>
@@ -205,78 +233,86 @@ const Payment = () => {
           💳 Thanh Toán Đơn Hàng
         </h1>
 
+        {loading && (
+          <div className="text-center text-lg text-red-500 font-semibold mb-6">
+            Đang tải giỏ hàng và thông tin địa chỉ...
+          </div>
+        )}
+
         <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-10">
-          {/* Tóm tắt đơn hàng (Giữ nguyên) */}
+          {/* Tóm tắt đơn hàng */}
           <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100 h-fit sticky top-4">
             <h2 className="text-2xl font-semibold text-red-600 mb-5 border-b pb-3">
               Tóm Tắt Đơn Hàng
             </h2>
-            {/* ... (phần render cart items) ... */}
-            {cartItems.length === 0 ? (
+
+            {validCartItems.length === 0 ? (
               <div className="text-center text-gray-500 py-10">
-                Giỏ hàng trống.
+                Giỏ hàng trống hoặc các sản phẩm không hợp lệ.
               </div>
             ) : (
               <>
-                {cartItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex justify-between items-center border-b py-3 hover:bg-gray-50 transition"
-                  >
-                    {/* ... item details ... */}
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={item.productId.productImage?.[0]}
-                        alt={item.productId.productName}
-                        className="w-16 h-16 object-contain rounded-md border"
-                      />
-                      <div>
-                        <h3 className="font-medium text-gray-800">
-                          {item.productId?.productName}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                          SL: {item.quantity}
-                        </p>
+                {validCartItems.map((item, idx) => {
+                  const product = item.productId;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center border-b py-3 hover:bg-gray-50 transition"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={product.productImage?.[0]}
+                          alt={product.productName}
+                          className="w-16 h-16 object-contain rounded-md border"
+                        />
+                        <div>
+                          <h3 className="font-medium text-gray-800">
+                            {product.productName}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            SL: {item.quantity}
+                          </p>
+                        </div>
                       </div>
+                      <span className="text-red-600 font-semibold">
+                        {displayINRCurrency(
+                          product.sellingPrice * item.quantity
+                        )}
+                      </span>
                     </div>
-                    <span className="text-red-600 font-semibold">
-                      {displayINRCurrency(
-                        item.productId?.sellingPrice * item.quantity
-                      )}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
+
                 <div className="mt-5 flex justify-between font-semibold text-gray-800">
                   <span>Tổng SL:</span>
                   <span>{totalQuantity}</span>
                 </div>
+
                 <div className="mt-2 flex justify-between text-xl font-bold text-red-600">
                   <span>Tổng tiền (VND):</span>
-                  <span>{displayINRCurrency(safeTotalCost)}</span>
+                  <span>{displayINRCurrency(safeTotalCostVND)}</span>
                 </div>
                 <div className="mt-1 text-right text-sm text-gray-500">
-                  (Tương đương: **{totalCostUSDString} USD** để thanh toán
-                  PayPal)
+                  (Thanh toán **{totalCostUSDString} USD** qua PayPal)
                 </div>
               </>
             )}
           </div>
-
           {/* Form thông tin và thanh toán */}
           <div className="w-full lg:w-1/2 bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
             <h2 className="text-2xl font-semibold mb-5 text-gray-800">
               Thông Tin Người Nhận & Phương Thức
             </h2>
-            {/* ⚠️ CHỈ DÙNG SUBMIT CHO THANH TOÁN COD */}
+            {/* Form submit chỉ gọi handleCODPayment khi chọn COD */}
             <form
               onSubmit={
                 paymentMethod === "cod"
-                  ? handleFormSubmit
+                  ? handleCODPayment
                   : (e) => e.preventDefault()
               }
               className="space-y-5"
             >
-              {/* Họ và tên, Số điện thoại (Giữ nguyên) */}
+              {/* --- Vùng Nhập liệu --- */}
               <div>
                 <label className="block mb-1 font-medium text-gray-700">
                   Họ và tên
@@ -286,10 +322,11 @@ const Payment = () => {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 transition"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
                   required
                 />
               </div>
+
               <div>
                 <label className="block mb-1 font-medium text-gray-700">
                   Số điện thoại
@@ -300,12 +337,11 @@ const Payment = () => {
                   value={formData.phone}
                   onChange={handleInputChange}
                   placeholder="VD: 0901234567"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 transition"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent transition"
                   required
                 />
               </div>
-
-              {/* Vùng chọn Địa chỉ (Giữ nguyên) */}
+              {/* Vùng chọn Địa chỉ */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <select
                   value={province}
@@ -320,6 +356,7 @@ const Payment = () => {
                     </option>
                   ))}
                 </select>
+
                 <select
                   value={district}
                   onChange={(e) => setDistrict(e.target.value)}
@@ -334,6 +371,7 @@ const Payment = () => {
                     </option>
                   ))}
                 </select>
+
                 <select
                   value={ward}
                   onChange={(e) => setWard(e.target.value)}
@@ -349,12 +387,12 @@ const Payment = () => {
                   ))}
                 </select>
               </div>
-
-              {/* Phương thức thanh toán (Cập nhật) */}
+              {/* Phương thức thanh toán */}
               <div>
                 <label className="block mb-2 font-medium text-gray-700">
                   Phương thức thanh toán
                 </label>
+
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -365,8 +403,10 @@ const Payment = () => {
                       onChange={() => setPaymentMethod("cod")}
                       className="accent-red-500"
                     />
+
                     <span>Thanh toán khi nhận hàng (COD)</span>
                   </label>
+
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="radio"
@@ -380,13 +420,12 @@ const Payment = () => {
                   </label>
                 </div>
               </div>
-
-              {/* --- KHỐI THANH TOÁN ONLINE (PAYPAL BUTTONS) --- */}
-              {paymentMethod === "online" && cartItems.length > 0 ? (
+              {/* --- KHỐI THANH TOÁN PAYPAL BUTTONS (ONLINE) --- */}
+              {paymentMethod === "online" && validCartItems.length > 0 && (
                 <div className="mt-6 pt-4 border-t border-indigo-200">
                   <h3 className="font-bold text-gray-800 mb-3 flex items-center">
-                    <span className="text-indigo-600 mr-2">🚀</span> Xác Nhận
-                    Thanh Toán PayPal
+                    <span className="text-indigo-600 mr-2">🚀</span> Thanh Toán
+                    An Toàn Với PayPal
                   </h3>
                   <PayPalButtons
                     style={{
@@ -403,24 +442,11 @@ const Payment = () => {
                     }
                     // 1. CREATE ORDER: Gọi Backend API để tạo Order
                     createOrder={async (data, actions) => {
-                      // Kiểm tra lại các điều kiện cần trước khi gọi API
-                      if (!userId) {
-                        Swal.fire("Lỗi", "Vui lòng đăng nhập.", "error");
-                        return;
-                      }
-                      if (!province || !district || !ward) {
-                        Swal.fire(
-                          "Lỗi",
-                          "Vui lòng chọn đầy đủ địa chỉ.",
-                          "error"
-                        );
-                        return;
-                      }
+                      if (!userId || !province) return;
 
                       const orderPayload = {
-                        totalCost: totalCostUSD, // Gửi số tiền USD đã tính
-                        // Gửi các thông tin cần thiết khác cho Backend
-                        items: cartItems.map((item) => ({
+                        totalCost: totalCostUSD, // Gửi USD cho Backend
+                        items: validCartItems.map((item) => ({
                           productId: item.productId._id,
                           quantity: item.quantity,
                         })),
@@ -444,7 +470,7 @@ const Payment = () => {
                         Swal.fire("Lỗi", result.message, "error");
                         return;
                       }
-                      return result.orderID; // Trả về PayPal Order ID
+                      return result.orderID;
                     }}
                     // 2. ON APPROVE: Gọi Backend API để Capture giao dịch
                     onApprove={async (data, actions) => {
@@ -473,11 +499,14 @@ const Payment = () => {
                           "Thanh toán PayPal hoàn tất!",
                           "success"
                         );
-                        setCartItems([]);
                         context.setCartProductCount(0);
                         navigate("/");
                       } else {
-                        Swal.fire("❌ Thất bại", result.message, "error");
+                        Swal.fire(
+                          "❌ Thất bại",
+                          result.message || "Giao dịch không hoàn tất.",
+                          "error"
+                        );
                       }
                     }}
                     onError={(err) => {
@@ -495,13 +524,15 @@ const Payment = () => {
                     </p>
                   )}
                 </div>
-              ) : (
-                // --- KHỐI THANH TOÁN COD (Nút Submit Form) ---
+              )}
+
+              {/* Nút Xác nhận Thanh toán COD (Chỉ hiển thị khi chọn COD) */}
+              {paymentMethod === "cod" && (
                 <button
                   type="submit"
-                  disabled={cartItems.length === 0 || paymentMethod !== "cod"}
+                  disabled={validCartItems.length === 0}
                   className={`w-full mt-6 font-bold py-3 rounded-lg shadow-md transition duration-200 ${
-                    cartItems.length === 0 || paymentMethod !== "cod"
+                    validCartItems.length === 0
                       ? "bg-gray-400 text-gray-700 cursor-not-allowed"
                       : "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white hover:shadow-lg"
                   }`}
