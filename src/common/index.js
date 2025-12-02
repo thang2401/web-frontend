@@ -132,7 +132,16 @@ const SummaryApi = {
     url: `${backendDomin}/api/orders`,
     method: "DELETE",
   },
+  paypalCreateOrder: {
+    url: `${backendDomin}/api/paypal_create_order`,
+    method: "post",
+  },
 
+  // 2. Xác nhận Capture (Frontend gọi -> Backend gọi PayPal)
+  paypalCaptureOrder: {
+    url: `${backendDomin} /api/paypal_capture_order`,
+    method: "post",
+  },
   vnpayCreatePaymentUrl: {
     url: `${backendDomin}/api/payment/create_payment_url`,
     method: "POST",
